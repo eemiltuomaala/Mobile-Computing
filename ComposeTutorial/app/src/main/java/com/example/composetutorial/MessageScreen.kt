@@ -1,5 +1,6 @@
 package com.example.composetutorial
 
+import android.app.Application
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,19 +31,41 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.rememberAsyncImagePainter
+import com.example.composetutorial.data.User
+import com.example.composetutorial.data.UserViewModel
+import com.example.composetutorial.data.UserViewModelFactory
+import java.io.File
 
 data class Message(val author: String, val body: String)
 
 @Composable
 fun MessageCard(msg: Message) {
     Row(modifier = Modifier.padding(all = 8.dp)) {
+        //val painter = rememberAsyncImagePainter(R.drawable.placeholder)
+        val context = LocalContext.current
+        var imageFile = File(context.filesDir, "profile.jpg")
+        val painter = rememberAsyncImagePainter(imageFile)
+
+
+        val mUserViewModel: UserViewModel = viewModel(factory = UserViewModelFactory(context.applicationContext as Application))
+        mUserViewModel.insertUser(User(1, "Default"))
+        val user by mUserViewModel.userData.collectAsState(initial = null)
+
         Image(
-            painter = painterResource(R.drawable.profile_picture),
+            painter = painter,
             contentDescription = null,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
@@ -60,11 +83,13 @@ fun MessageCard(msg: Message) {
 
         // We toggle the isExpanded variable when we click on this Column
         Column(modifier = Modifier.clickable { isExpanded = !isExpanded }) {
-            Text(
-                text = msg.author,
-                color = MaterialTheme.colorScheme.secondary,
-                style = MaterialTheme.typography.titleSmall
-            )
+            user?.userName?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.titleSmall
+                )
+            }
 
             Spacer(modifier = Modifier.height(4.dp))
 
@@ -95,23 +120,27 @@ fun MessageCard(msg: Message) {
 fun Conversation(navController: NavController, messages: List<Message>) {
     LazyColumn {
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.End
-            ) {
-                IconButton(
-                    onClick = {
-                        navController.navigate("settings")
-                    },
-
-                    ) {
+            Row() {
+                // Button on top of the screen
+                IconButton(onClick = {
+                    navController.navigate("settings")
+                }) {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings"
+                        contentDescription = "Settings",
+                        modifier = Modifier
+                            .align(Alignment.CenterVertically)
                     )
                 }
+
+                // Text on top of the screen
+                Text(
+                    text = "Messages",
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier
+                        .align(Alignment.CenterVertically)
+                )
             }
         }
         items(messages) { message ->

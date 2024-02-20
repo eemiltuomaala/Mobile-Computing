@@ -14,16 +14,23 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.composetutorial.data.AppDatabase
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Create instance of database
+        val database = AppDatabase.getInstance(applicationContext)
+        var userDao = database.userDao()
+
         setContent {
             ComposeTutorialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     val navController = rememberNavController()
+
 
                     NavHost(
                         navController = navController,
@@ -42,24 +49,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-/*
-@Preview(name = "Light Mode")
-@Preview(
-    uiMode = Configuration.UI_MODE_NIGHT_YES,
-    showBackground = true,
-    name = "Dark Mode"
-)
-@Composable
-fun PreviewMessageCard() {
-    ComposeTutorialTheme {
-        Surface {
-            MessageCard(
-                msg = Message("Masa", "Hey, take a look at Jetpack Compose, it's great!")
-            )
-        }
-    }
-}
-*/
 @Preview(name = "Light Mode")
 @Preview(
     uiMode = Configuration.UI_MODE_NIGHT_YES,
