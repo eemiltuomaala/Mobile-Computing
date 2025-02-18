@@ -1,6 +1,7 @@
 package com.example.composetutorial
 
 import android.app.Application
+import android.content.res.Configuration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,16 +36,20 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.composetutorial.data.User
 import com.example.composetutorial.data.UserViewModel
 import com.example.composetutorial.data.UserViewModelFactory
+import com.example.composetutorial.ui.theme.ComposeTutorialTheme
 import java.io.File
 
 data class Message(val author: String, val body: String)
@@ -141,10 +146,36 @@ fun Conversation(navController: NavController, messages: List<Message>) {
                     modifier = Modifier
                         .align(Alignment.CenterVertically)
                 )
+
+                // Display light sensor data
+                /*Text(
+                    text = "Light: $lightLevel lx",
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier
+                        .padding(horizontal = 64.dp)
+                        .align(Alignment.CenterVertically)
+                )*/
             }
         }
         items(messages) { message ->
             MessageCard(message)
+        }
+    }
+}
+@Preview(name = "Light Mode")
+@Preview(
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    showBackground = true,
+    name = "Dark Mode"
+)
+@Composable
+fun PreviewConversation(
+    navController: NavController = rememberNavController(),
+) {
+    ComposeTutorialTheme {
+        Surface {
+            Conversation(navController = navController, SampleData.conversationSample)
         }
     }
 }

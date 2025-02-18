@@ -23,8 +23,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,10 +48,35 @@ import java.io.FileOutputStream
 @Composable
 fun SettingsScreen(navController: NavHostController) {
     val context = LocalContext.current
-    val mUserViewModel: UserViewModel = viewModel(factory = UserViewModelFactory(context.applicationContext as Application))
+    val mUserViewModel: UserViewModel =
+        viewModel(factory = UserViewModelFactory(context.applicationContext as Application))
     //mUserViewModel.insertUser(User(1, "Default"))
     val user by mUserViewModel.userData.collectAsState(initial = null)
 
+
+    val lightValue = remember { mutableFloatStateOf(0f) }
+    var hasNotified by remember { mutableStateOf(false) } // Track notification state
+    val sensorListener = remember { SensorListener(context) { lux -> lightValue.floatValue = lux }}
+
+    // prevents multiple notifications if light level is above 20 000 lux
+    if (lightValue.floatValue >= 20000 && !hasNotified) {
+        val activity = context as? MainActivity
+        activity?.showNotification()
+        hasNotified = true // Mark notification as sent
+    }
+
+    // Reset notification state if light level drops below 20,000 lux
+    if (lightValue.floatValue < 20000) {
+        hasNotified = false
+    }
+
+    val activity = LocalContext.current as? MainActivity
+
+
+    DisposableEffect(Unit) {
+        sensorListener.register()
+        onDispose { sensorListener.unregister() }
+    }
 
     var imageFile = File(context.filesDir, "profile.jpg")
     var updateImage by remember { mutableStateOf(false) }
@@ -57,7 +84,7 @@ fun SettingsScreen(navController: NavHostController) {
     val photoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        uri?.let {imageUri ->
+        uri?.let { imageUri ->
             val inputStream = context.contentResolver.openInputStream(imageUri)
             val outputFile = File(context.filesDir, "profile.jpg")
             FileOutputStream(outputFile).use { outputStream ->
@@ -97,6 +124,13 @@ fun SettingsScreen(navController: NavHostController) {
         }
 
         Row(modifier = Modifier.padding(all = 8.dp)) {
+            Button(onClick = {
+                activity?.showNotification()
+            }) {
+                Text("Send a test notification")
+            }
+        }
+        Row(modifier = Modifier.padding(all = 8.dp)) {
             val painter = if (updateImage) {
                 rememberAsyncImagePainter(imageFile)
             } else {
@@ -125,199 +159,24 @@ fun SettingsScreen(navController: NavHostController) {
         Row(modifier = Modifier.padding(all = 8.dp)) {
             OutlinedTextField(
                 value = user?.userName ?: "",
-                onValueChange = {newName ->
-                    mUserViewModel.updateUser(user?.copy(userName = newName) ?: User(userName = newName))
+                onValueChange = { newName ->
+                    mUserViewModel.updateUser(
+                        user?.copy(userName = newName) ?: User(userName = newName)
+                    )
                 },
                 label = { Text("Enter your name") },
 
                 )
         }
-        /*
-        Spacer(modifier = Modifier.height(32.dp))
+
+        // Light Level
         Row(modifier = Modifier.padding(all = 8.dp)) {
-            Button(
-                onClick = {
-                    //Save Changes
-                },
-                modifier = Modifier
-                    .padding(start = 8.dp)
-                    .align(Alignment.CenterVertically)
-            ) {
-                Text(text = "Save Changes")
-            }
+            Text(text = "Ambient Light: ${"%.1f".format(lightValue.floatValue)} lux")
         }
-        */
-    }
-}
-/*
-@Composable
-fun SettingsScreen(navController: NavHostController, userDao: UserDao) {
-    //val viewModel: UserViewModel = viewModel()
-    //val userState by viewModel.userState.collectAsState()
-    var userName by remember { mutableStateOf("Default") }
-
-    Column() {
-        Row() {
-            // Button on top of the screen
-            IconButton(onClick = {
-                navController.navigate("home") {
-                    popUpTo("home") {
-                        inclusive = true
-                    }
-                }
-            }) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    modifier = Modifier
-                        .align(Alignment.CenterVertically)
-                )
-            }
-
-            // Text on top of the screen
-            Text(
-                text = "Settings Screen",
-                color = MaterialTheme.colorScheme.secondary,
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier
-                    .align(Alignment.CenterVertically)
-            )
-        }
-
-
-
         Row(modifier = Modifier.padding(all = 8.dp)) {
-            val painter = rememberAsyncImagePainter(R.drawable.placeholder)
-
-            Image(
-                painter = painter,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .border(1.5.dp, MaterialTheme.colorScheme.secondary, CircleShape)
-                    .align(Alignment.CenterVertically)
-            )
-
-            Button(
-                onClick = {
-
-                },
-                modifier = Modifier
-                    .padding(start = 8.dp)
-                    .align(Alignment.CenterVertically)
-            ) {
-                Text(text = "Select picture")
-            }
-        }
-
-        Row(modifier = Modifier.padding(all = 8.dp)) {
-            //var userName = "Default"
-
-            OutlinedTextField(
-                value = userName,
-                onValueChange = {newName ->
-                                userName = newName
-                    //
-                },
-                /*
-                value = userName,
-                onValueChange = {newName ->
-                    userName = newName
-                },
-                */
-                label = { Text("Enter your name") },
-
-                )
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Row(modifier = Modifier.padding(all = 8.dp)) {
-            Button(
-                onClick = {
-                    //viewModel.saveChanges()
-                },
-                modifier = Modifier
-                    .padding(start = 8.dp)
-                    .align(Alignment.CenterVertically)
-            ) {
-                Text(text = "Save Changes")
+            if (lightValue.floatValue >= 20000) {
+                Text(text = "Light level is over 20,000 lux!")
             }
         }
     }
 }
-
-
-
-
-
-/*
-var userName = ""
-
-LazyColumn {
-    item {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.Start
-        ) {
-            IconButton(
-                onClick = {
-                    navController.navigate("home") {
-                        popUpTo("home") {
-                            inclusive = true
-                        }
-                    } },
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Settings"
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Text(
-                text = "Settings Screen",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier
-                    .padding(end = 16.dp)
-                    .align(Alignment.CenterVertically)
-            )
-        }
-    }
-    item {
-        val painter = rememberAsyncImagePainter(R.drawable.placeholder)
-
-        Image(
-            painter = painter,
-            contentDescription = null,
-            modifier = Modifier
-                .padding(16.dp)
-                .size(40.dp)
-                .clip(CircleShape)
-                .border(1.5.dp, MaterialTheme.colorScheme.secondary, CircleShape)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-    }
-    item {
-        OutlinedTextField(
-            value = "userName",
-            onValueChange = {},
-            /*
-            value = userName,
-            onValueChange = {newName ->
-                userName = newName
-            },
-            */
-            label = { Text("Enter your name") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        )
-    }
-}
-*/
