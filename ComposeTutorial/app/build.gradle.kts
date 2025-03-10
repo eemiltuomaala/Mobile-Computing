@@ -95,4 +95,10 @@ dependencies {
     // Notification
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.core:core:1.12.0")
+
+    // Splash Screen
+    implementation("androidx.core:core-splashscreen:1.0.0")
+
+    // Permissions
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 }

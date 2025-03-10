@@ -22,17 +22,74 @@ import androidx.navigation.compose.rememberNavController
 import com.example.composetutorial.data.AppDatabase
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.app.PendingIntent
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 const val CHANNEL_ID = "channel"
 class MainActivity : ComponentActivity() {
+    private var hasNotified by mutableStateOf(false)
+    private lateinit var sensorListener: SensorListener
+    private val sharedViewModel: SharedViewModel by viewModels()
+
+
+    // List of required permissions
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private val requiredPermissions = arrayOf(
+        Manifest.permission.POST_NOTIFICATIONS,
+        Manifest.permission.CAMERA
+    )
+
+    // Permission launcher for requesting multiple permissions
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private val requestPermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allPermissionsGranted = permissions.all { it.value }
+        if (allPermissionsGranted) {
+            // All permissions granted, proceed with app logic
+        } else {
+            // Handle denied permissions
+            if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) ||
+                shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
+            ) {
+                showPermissionRationaleDialog()
+            } else {
+                showPermissionDeniedDialog()
+            }
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        installSplashScreen().apply {
+
+        }
+
+        // Initialize the sensor listener
+        sensorListener = SensorListener(this) { lux ->
+            sharedViewModel.updateLightLevel(lux) // Update light level in SharedViewModel
+            checkLightLevelAndNotify(lux)
+        }
+
+        // Start monitoring light level
+        sensorListener.register()
+
+        //  Check for notification permission on cold launch
+        checkRequiredPermissions()
 
         // Create instance of database
         val database = AppDatabase.getInstance(applicationContext)
@@ -51,24 +108,78 @@ class MainActivity : ComponentActivity() {
                             Conversation(navController = navController, SampleData.conversationSample)
                         }
                         composable("settings") {
-                            SettingsScreen(navController = navController)
+                            SettingsScreen(navController = navController, sharedViewModel = sharedViewModel)
                         }
                     }
                 }
             }
         }
         createNotificationChannel()
-        requestNotificationPermission()
     }
 
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
+    override fun onDestroy() {
+        super.onDestroy()
+        // Unregister the sensor listener when the activity is destroyed
+        sensorListener.unregister()
+    }
 
-                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
-            }
+    private fun checkLightLevelAndNotify(lux: Float) {
+        if (lux >= 20000 && !hasNotified) {
+            showNotification()
+            hasNotified = true
+        } else if (lux < 20000) {
+            hasNotified = false
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private fun checkRequiredPermissions() {
+        val permissionsToRequest = requiredPermissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }.toTypedArray()
+
+        if (permissionsToRequest.isNotEmpty()) {
+            if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) ||
+                shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
+            ) {
+                showPermissionRationaleDialog()
+            } else {
+                requestPermissionsLauncher.launch(permissionsToRequest)
+            }
+        } else {
+            // All permissions already granted, proceed with app logic
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private fun showPermissionRationaleDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Permissions Needed")
+            .setMessage("This app needs notification and camera permissions to function properly. Please grant the permissions to continue.")
+            .setPositiveButton("OK") { _, _ ->
+                // Request the permissions again
+                requestPermissionsLauncher.launch(requiredPermissions)
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun showPermissionDeniedDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Permissions Denied")
+            .setMessage("You have denied the required permissions multiple times. Please enable them in the app settings to use all features.")
+            .setPositiveButton("Go to Settings") { _, _ ->
+                // Open app settings
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                intent.data = Uri.fromParts("package", packageName, null)
+                startActivity(intent)
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
     }
 
     private fun createNotificationChannel() {

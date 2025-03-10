@@ -46,7 +46,7 @@ import java.io.File
 import java.io.FileOutputStream
 
 @Composable
-fun SettingsScreen(navController: NavHostController) {
+fun SettingsScreen(navController: NavHostController, sharedViewModel: SharedViewModel) {
     val context = LocalContext.current
     val mUserViewModel: UserViewModel =
         viewModel(factory = UserViewModelFactory(context.applicationContext as Application))
@@ -54,29 +54,10 @@ fun SettingsScreen(navController: NavHostController) {
     val user by mUserViewModel.userData.collectAsState(initial = null)
 
 
-    val lightValue = remember { mutableFloatStateOf(0f) }
-    var hasNotified by remember { mutableStateOf(false) } // Track notification state
-    val sensorListener = remember { SensorListener(context) { lux -> lightValue.floatValue = lux }}
-
-    // prevents multiple notifications if light level is above 20 000 lux
-    if (lightValue.floatValue >= 20000 && !hasNotified) {
-        val activity = context as? MainActivity
-        activity?.showNotification()
-        hasNotified = true // Mark notification as sent
-    }
-
-    // Reset notification state if light level drops below 20,000 lux
-    if (lightValue.floatValue < 20000) {
-        hasNotified = false
-    }
+    // Observe light level from SharedViewModel
+    val lightLevel by sharedViewModel.lightLevel.collectAsState()
 
     val activity = LocalContext.current as? MainActivity
-
-
-    DisposableEffect(Unit) {
-        sensorListener.register()
-        onDispose { sensorListener.unregister() }
-    }
 
     var imageFile = File(context.filesDir, "profile.jpg")
     var updateImage by remember { mutableStateOf(false) }
@@ -171,10 +152,10 @@ fun SettingsScreen(navController: NavHostController) {
 
         // Light Level
         Row(modifier = Modifier.padding(all = 8.dp)) {
-            Text(text = "Ambient Light: ${"%.1f".format(lightValue.floatValue)} lux")
+            Text(text = "Ambient Light: ${"%.1f".format(lightLevel)} lux")
         }
         Row(modifier = Modifier.padding(all = 8.dp)) {
-            if (lightValue.floatValue >= 20000) {
+            if (lightLevel >= 20000) {
                 Text(text = "Light level is over 20,000 lux!")
             }
         }
